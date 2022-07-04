@@ -1,0 +1,11 @@
+global:
+  azureEnvironment: AZUREPUBLICCLOUD
+  location: {{LOCATION}}
+  onboardingPrivateKey: |-
+    {{PRIVATE-KEY}}
+  resourceGroupName: {{RESOURCE-GROUP}}
+  resourceName: {{CLUSTER-NAME}}
+  subscriptionId: {{SUBSCRIPTION-ID}}
+  tenantId: {{TENANT-ID}}
+systemDefaultValues:  
+  spnOnboarding: false
