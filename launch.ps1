@@ -5,8 +5,6 @@ $ResourceGroupName = $Params[2]
 $Location = $Params[3]
 $ClusterName = $Params[4]
 
-#az connectedk8s connect --name $ClusterName --resource-group $ResourceGroupName
-
 $RSA = [System.Security.Cryptography.RSA]::Create(4096)
 $AgentPublicKey = [System.Convert]::ToBase64String($RSA.ExportRSAPublicKey())
 Write-Output "Public key"
@@ -33,11 +31,16 @@ az deployment group create `
   --template-file ./arc.bicep `
   --parameters clusterName=$ClusterName agentPublicKey=$AgentPublicKey
 
-# Only on OpenShift: oc adm policy add-scc-to-user privileged system:serviceaccount:azure-arc:azure-arc-kube-aad-proxy-sa
-# Only for Helm<3.8: Set-Item -Path Env:HELM_EXPERIMENTAL_OCI -Value 1 
-#helm pull "mcr.microsoft.com/azurearck8s/batch1/stable/azure-arc-k8sagents:1.7.4"
-#curl -L https://mcr.microsoft.com/v2/azurearck8s/batch1/stable/azure-arc-k8sagents/blobs/sha256:7fc94ec9f88092bfd61fd2cadcea7814b87b9325f5df4b3f61d11a479e3f727a --output arc.tar.gz
-#extract
+$LastHelmPackage = Invoke-RestMethod "https://$Location.dp.kubernetesconfiguration.azure.com/azure-arc-k8sagents/GetLatestHelmPackagePath?api-version=2019-11-01-preview&releaseTrain=stable" -Method "POST"
+$Chart = $LastHelmPackage.repositoryPath
+$Chart -match "(?<domain>[^/]+)(?<chart>[^:]+)\:(?<version>[\d\.]+)" | Out-Null
+
+# TODO: Replace with helm pull when it works properly
+$ManifestHeaders = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$ManifestHeaders.Add("Accept", "application/vnd.oci.image.manifest.v1+json")
+$Manifest = Invoke-RestMethod "https://$($Matches["domain"])/v2$($Matches["chart"])/manifests/$($Matches["version"])" -Method "GET" -Headers $ManifestHeaders
+Invoke-WebRequest -Uri "https://$($Matches["domain"])/v2$($Matches["chart"])/blobs/$($Manifest.layers[0].digest)" -OutFile "azure-arc.tar.gz"
+tar -zxvf azure-arc.tar.gz
 
 $Template = [System.IO.File]::ReadAllText("template.yaml")
 $Template = $Template.Replace("{{LOCATION}}", $Location)
@@ -49,12 +52,3 @@ $Template = $Template.Replace("{{TENANT-ID}}", $TenantId)
 [System.IO.File]::WriteAllText("values.yaml", $Template)
 
 helm upgrade --install azure-arc ./azure-arc-k8sagents -f ./values.yaml --debug
-
-# helm upgrade --install azure-arc ./azure-arc-k8sagents `
-#   --set global.subscriptionId=$SubscriptionId `
-#   --set global.resourceGroupName=$ResourceGroupName `
-#   --set global.resourceName=$ClusterName  `
-#   --set global.tenantId=$TenantId `
-#   --set global.location=$Location `
-#   --set "global.onboardingPrivateKey=$AgentPrivateKey" `
-#   --set systemDefaultValues.spnOnboarding=false
