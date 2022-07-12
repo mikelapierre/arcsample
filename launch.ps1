@@ -33,9 +33,23 @@ az deployment group create `
 
 $LastHelmPackage = Invoke-RestMethod "https://$Location.dp.kubernetesconfiguration.azure.com/azure-arc-k8sagents/GetLatestHelmPackagePath?api-version=2019-11-01-preview&releaseTrain=stable" -Method "POST"
 $Chart = $LastHelmPackage.repositoryPath
-$Chart -match "(?<domain>[^/]+)(?<chart>[^:]+)\:(?<version>[\d\.]+)" | Out-Null
+
+# $Chart = $Chart.Split(":")
+# if (!(get-item helm))
+# {
+#     mkdir helm
+#     if ($IsLinux) { Invoke-WebRequest -Uri https://get.helm.sh/helm-v3.6.3-linux-amd64.tar.gz -OutFile helm.tar.gz }
+#     if ($IsWindows) { Invoke-WebRequest -Uri https://get.helm.sh/helm-v3.6.3-windows-amd64.tar.gz -OutFile helm.tar.gz }
+#     tar -zxvf helm.tar.gz --strip-components=1 -C ./helm
+# }
+# if (!(get-item azure-arc-k8sagents))
+# {
+#     $env:HELM_EXPERIMENTAL_OCI=1
+#     ./helm/helm pull "oci://$($Chart[0])" --version "$($Chart[1])" --untar --debug
+# }
 
 # TODO: Replace with helm pull when it works properly
+$Chart -match "(?<domain>[^/]+)(?<chart>[^:]+)\:(?<version>[\d\.]+)" | Out-Null
 $ManifestHeaders = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 $ManifestHeaders.Add("Accept", "application/vnd.oci.image.manifest.v1+json")
 $Manifest = Invoke-RestMethod "https://$($Matches["domain"])/v2$($Matches["chart"])/manifests/$($Matches["version"])" -Method "GET" -Headers $ManifestHeaders
